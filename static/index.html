@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Oral Practice Web</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="immersive-disabled">
+    <div class="toolbar" style="flex-direction: column; align-items: flex-start;">
+        <div style="display:flex; justify-content:space-between; width:100%; align-items:center; margin-bottom: 10px;">
+            <div style="font-weight: bold; color: #1e293b; font-size: 16px;">
+                Current: <span id="currentPracticeTitle" style="color: #3b82f6;">None</span>
+            </div>
+            <div style="display:flex; gap:10px;">
+                <button id="clear-btn" style="background:#ef4444; color:white;">Clear</button>
+                <button id="history-btn" style="background:#0f172a; color:white;">History</button>
+            </div>
+        </div>
+        
+        <div style="display:flex; gap:15px; align-items:center; flex-wrap:wrap;" class="toolbar-top-row">
+            <input type="file" id="file-input" accept=".txt,.md">
+            <button id="upload-btn">Generate Practice (Fast)</button>
+            <select id="translationEngine" class="hidden">
+              <option value="gemini">Gemini Quality</option>
+              <option value="fast">Fast Free Translator</option>
+              <option value="argos">Offline Argos</option>
+            </select>
+            <button id="gen-zh-btn" style="background:#059669;" class="hidden">Generate Chinese</button>
+            <button id="immersive-btn" style="background:#4c1d95;">Immersive Mode</button>
+            
+            <div class="controls hidden" id="player-controls">
+                <button id="restart-btn" style="background:#2563eb;">Restart</button>
+                <button id="prev-btn">Prev</button>
+                <button id="play-pause-btn">Play</button>
+                <button id="resume-btn" style="background:#10b981;">Resume</button>
+                <button id="next-btn">Next</button>
+                
+                <label for="speed-select">Speed: </label>
+                <select id="speed-select">
+                    <option value="0.75">0.75x</option>
+                    <option value="1.0" selected>1.0x</option>
+                    <option value="1.25">1.25x</option>
+                    <option value="1.5">1.5x</option>
+                </select>
+
+                <span id="progress-text" class="progress-info">0 / 0</span>
+            </div>
+        </div>
+        
+        <div id="translationProgressBox" class="hidden" style="margin-top: 10px; display: flex; align-items: center; gap: 10px;">
+          <div id="translationProgressText" style="font-size: 13px; min-width: 150px; font-weight: bold; color: #4a5568;">Chinese Translation: idle</div>
+          <div class="progress-bar">
+            <div id="translationProgressFill"></div>
+          </div>
+        </div>
+        
+        <div class="downloads hidden" id="download-controls" style="margin-top:10px; display:flex; gap:10px; align-items:center;">
+            <label for="format-select">Format: </label>
+            <select id="format-select">
+                <option value="mp3" selected>mp3</option>
+                <option value="wav">wav</option>
+                <option value="m4a">m4a</option>
+            </select>
+            <button id="dl-current-btn">DL Current</button>
+            <button id="dl-all-btn">DL All Zip</button>
+            <button id="dl-merged-btn">DL Merged Audio</button>
+        </div>
+    </div>
+
+    <div class="main app-layout" id="app-layout">
+        <div class="left-pane" id="text-area">
+            <p class="placeholder-text">Please upload a .txt or .md file, or open a saved practice from History.</p>
+        </div>
+        <div class="panel-toggle" id="panel-toggle" title="Toggle Vocabulary">›</div>
+        <div class="right-pane vocab-panel" id="vocab-area">
+            <h3>Vocabulary</h3>
+            <p class="placeholder-text">No practice loaded.</p>
+        </div>
+    </div>
+
+    <!-- History Modal -->
+    <div id="historyModal" class="history-modal hidden">
+      <div class="history-modal-content">
+        <div class="history-header">
+          <h2>History</h2>
+          <button id="closeHistoryBtn">×</button>
+        </div>
+        <div id="historyList" class="history-list"></div>
+      </div>
+    </div>
+
+    <!-- 悬浮调试面板恢复按钮 -->
+    <button id="show-debug-btn" class="hidden" style="position:fixed; bottom:20px; right:20px; z-index:9999;">Show Debug</button>
+
+    <!-- 强制调试面板 -->
+    <div id="debug-panel" class="debug-panel">
+        <div class="debug-header" id="debug-header">
+            <span>Debug Panel</span>
+            <div class="debug-actions">
+                <span id="dbg-collapse-btn">[ - ]</span>
+                <span id="dbg-hide-btn">[ X ]</span>
+                <span id="dbg-reset-btn">[ R ]</span>
+            </div>
+        </div>
+        <div class="debug-body" id="debug-body">
+            <div>Sentence Idx: <span id="dbg-s-idx"></span></div>
+            <div>Audio Time: <span id="dbg-time"></span></div>
+            <div>Word Idx: <span id="dbg-w-idx"></span></div>
+            <div>Word Text: <span id="dbg-w-text"></span></div>
+            <div>Words Len: <span id="dbg-w-len"></span></div>
+            <div>ZH Segments Len: <span id="dbg-zh-len"></span></div>
+            <div>Pending ZH: <span id="dbg-pending-zh"></span></div>
+            <div>.word Count: <span id="dbg-word-count"></span></div>
+            <div>.active-word Count: <span id="dbg-active-count"></span></div>
+        </div>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>

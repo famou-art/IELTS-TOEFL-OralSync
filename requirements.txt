@@ -1,0 +1,7 @@
+fastapi
+uvicorn
+python-multipart
+edge-tts
+aiofiles
+deep-translator
+eng-to-ipa
