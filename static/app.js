@@ -31,10 +31,8 @@ const appLayout = document.getElementById('app-layout');
 const panelToggleBtn = document.getElementById('panel-toggle');
 
 const restartBtn = document.getElementById('restart-btn');
-const prevBtn = document.getElementById('prev-btn');
 const playPauseBtn = document.getElementById('play-pause-btn');
 const resumeBtn = document.getElementById('resume-btn');
-const nextBtn = document.getElementById('next-btn');
 
 const speedSelect = document.getElementById('speed-select');
 const progressText = document.getElementById('progress-text');
@@ -840,8 +838,6 @@ if ('speechSynthesis' in window) {
 // --- Nav Controls ---
 restartBtn.addEventListener('click', () => jumpToSentence(0, true));
 resumeBtn.addEventListener('click', () => jumpToSentence(currentSentenceIndex, true));
-prevBtn.addEventListener('click', () => jumpToSentence(Math.max(0, currentSentenceIndex - 1), isPlaying));
-nextBtn.addEventListener('click', () => jumpToSentence(Math.min(manifest.sentences.length - 1, currentSentenceIndex + 1), isPlaying));
 
 playPauseBtn.addEventListener('click', () => {
     if (!manifest) return;
@@ -913,3 +909,15 @@ function updateDebugPanel() {
     document.getElementById('dbg-word-count').innerText = wordCount;
     document.getElementById('dbg-active-count').innerText = activeCount;
 }
+
+
+// --- Keyboard Controls ---
+document.addEventListener('keydown', (e) => {
+    // Only intercept Space key if we're not typing in an input/textarea
+    if (e.code === 'Space' && e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
+        e.preventDefault(); // Prevent page scrolling
+        if (manifest) {
+            playPauseBtn.click(); // Trigger the exact same logic as Play/Pause button
+        }
+    }
+});
