@@ -14,7 +14,7 @@ A local web application for oral English practice, featuring sentence parsing, d
 
 1. Change directory to the project folder:
    ```bash
-   cd REDACTED
+   cd oral_practice_web
    ```
 
 2. Create a virtual environment and activate it:
