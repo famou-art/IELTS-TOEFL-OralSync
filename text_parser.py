@@ -1,10 +1,9 @@
-import re
+import pysbd
+
+_segmenter = pysbd.Segmenter(language="en", clean=True)
 
 def split_into_sentences(text: str):
-    # 将换行替换为空格
-    text = text.replace('\n', ' ')
-    # 简易英文分句逻辑（根据. ! ?和后跟的空格进行切割）
-    raw_sentences = re.split(r'(?<=[.!?])\s+', text)
-    # 去除空白句
-    sentences = [s.strip() for s in raw_sentences if s.strip()]
-    return sentences
+    # 将多行文本合并为单行
+    text = ' '.join(text.split('\n'))
+    # 用 pysbd 分句，正确处理 Mr. e.g. Jan. 等缩写
+    return [s.strip() for s in _segmenter.segment(text) if s.strip()]

@@ -13,7 +13,8 @@ from text_parser import split_into_sentences
 from tts_with_timestamps import generate_tts_with_timestamps
 from vocab_extractor import extract_vocabulary
 from translate_align import process_translation_engine
-from audio_exporter import export_current_sentence, export_all_zip, export_merged
+from audio_exporter import export_current_sentence, export_all_zip, export_merged, export_podcast
+from anki_exporter import export_anki
 import history_manager
 
 app = FastAPI()
@@ -189,3 +190,15 @@ def download_all(run_id: str, format: str = Query("mp3")):
 @app.get("/api/download/merged")
 def download_merged(run_id: str, format: str = Query("mp3")):
     return export_merged(run_id, format)
+
+@app.get("/api/download/podcast")
+def download_podcast(
+    run_id: str,
+    mode: str = Query("en_pause_zh"),
+    multiplier: float = Query(1.2)
+):
+    return export_podcast(run_id, mode, multiplier)
+
+@app.get("/api/download/anki")
+def download_anki(run_id: str):
+    return export_anki(run_id)

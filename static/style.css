@@ -490,3 +490,132 @@ body.article-playing .word {
 .btn-open { background: #10b981; }
 .btn-rename { background: #3b82f6; }
 .btn-delete { background: #ef4444; }
+
+/* ═══════════════════════════════════════════════════════════
+   新增样式区 — Shadowing Mode / Pitch Canvas / Podcast/Anki
+   ═══════════════════════════════════════════════════════════ */
+
+/* left-pane 包裹层，用于放 pitch canvas */
+.left-pane-wrapper {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    position: relative;
+    min-width: 0;
+}
+
+/* left-pane 自身保持 flex: 1 可滚动 */
+.left-pane-wrapper > .left-pane {
+    flex: 1;
+    min-height: 0;
+}
+
+/* Pitch Canvas 容器 */
+#pitch-canvas-container {
+    flex-shrink: 0;
+    background: #0f172a;
+    border-top: 1px solid #1e293b;
+    padding: 6px 12px 4px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+#pitch-legend {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+    font-size: 12px;
+    font-family: monospace;
+}
+
+.legend-native { color: #f97316; }
+.legend-user   { color: #38bdf8; }
+
+#pitch-status-text {
+    margin-left: auto;
+    color: #64748b;
+    font-size: 11px;
+}
+
+#pitch-canvas {
+    width: 100%;
+    height: 72px;
+    display: block;
+    border-radius: 4px;
+}
+
+/* ── Shadowing Mode 按钮（麦克风，挂在每个 sentence-row 旁） ── */
+.shadowing-btn {
+    flex-shrink: 0;
+    margin-left: 8px;
+    margin-top: 3px;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: #f1f5f9;
+    color: #64748b;
+    font-size: 14px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s, transform 0.15s;
+    border: 1px solid #e2e8f0;
+}
+.shadowing-btn:hover {
+    background: #dbeafe;
+    color: #1d4ed8;
+    transform: scale(1.12);
+}
+.shadowing-btn.recording {
+    background: #fee2e2;
+    color: #dc2626;
+    animation: pulse-mic 0.8s ease-in-out infinite;
+}
+
+@keyframes pulse-mic {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.4); }
+    50%       { box-shadow: 0 0 0 6px rgba(220, 38, 38, 0); }
+}
+
+/* 倒计时覆盖层 */
+.shadowing-countdown {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(15, 23, 42, 0.75);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 56px;
+    font-weight: 900;
+    color: white;
+    border-radius: 8px;
+    z-index: 100;
+    pointer-events: none;
+}
+
+/* 跟读评分气泡 */
+.shadowing-score-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 44px;
+    height: 22px;
+    padding: 0 8px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 700;
+    margin-left: 10px;
+    transition: background 0.3s, color 0.3s;
+}
+.shadowing-score-badge.score-high  { background: #d1fae5; color: #065f46; }
+.shadowing-score-badge.score-mid   { background: #fef3c7; color: #92400e; }
+.shadowing-score-badge.score-low   { background: #fee2e2; color: #991b1b; }
+
+/* 单词评分着色（Shadowing Diff 结果） */
+.word.word-correct { background: #d1fae5 !important; color: #065f46 !important; border-radius: 4px; }
+.word.word-wrong   { background: #fee2e2 !important; color: #991b1b !important;
+                     text-decoration: line-through !important; border-radius: 4px; }
+

@@ -65,15 +65,46 @@
             <button id="dl-current-btn">DL Current</button>
             <button id="dl-all-btn">DL All Zip</button>
             <button id="dl-merged-btn">DL Merged Audio</button>
+
+            <!-- 播客导出 -->
+            <span style="margin-left:8px; color:#94a3b8;">|</span>
+            <select id="podcast-mode-select" style="background:#f1f5f9;">
+                <option value="en_pause_zh">🎙 EN + ZH (通勤复习)</option>
+                <option value="en_pause">🔇 EN Only (纯跟读)</option>
+            </select>
+            <select id="podcast-multiplier-select" style="background:#f1f5f9; width:80px;">
+                <option value="0.8">0.8x 停顿</option>
+                <option value="1.0">1.0x 停顿</option>
+                <option value="1.2" selected>1.2x 停顿</option>
+                <option value="1.5">1.5x 停顿</option>
+                <option value="2.0">2.0x 停顿</option>
+            </select>
+            <button id="dl-podcast-btn" style="background:#7c3aed;">🎧 DL Podcast</button>
+
+            <!-- Anki 导出 -->
+            <span style="margin-left:8px; color:#94a3b8;">|</span>
+            <button id="dl-anki-btn" style="background:#0891b2;">📦 Export Anki</button>
         </div>
+
     </div>
 
     <!-- 点读单词悬浮提示状态 -->
     <div id="wordSpeakStatus" class="word-speak-status"></div>
 
     <div class="main app-layout" id="app-layout">
-        <div class="left-pane" id="text-area">
-            <p class="placeholder-text">Please upload a .txt or .md file, or open a saved practice from History.</p>
+        <div class="left-pane-wrapper">
+            <div class="left-pane" id="text-area">
+                <p class="placeholder-text">Please upload a .txt or .md file, or open a saved practice from History.</p>
+            </div>
+            <!-- Pitch Contour 可视化 -->
+            <div id="pitch-canvas-container" class="hidden">
+                <div id="pitch-legend">
+                    <span class="legend-native">● 原声</span>
+                    <span class="legend-user">● 你的声音</span>
+                    <span id="pitch-status-text"></span>
+                </div>
+                <canvas id="pitch-canvas"></canvas>
+            </div>
         </div>
         <div class="panel-toggle" id="panel-toggle" title="Toggle Vocabulary">›</div>
         <div class="right-pane vocab-panel" id="vocab-area">
@@ -81,6 +112,7 @@
             <p class="placeholder-text">No practice loaded.</p>
         </div>
     </div>
+
 
     <!-- History Modal -->
     <div id="historyModal" class="history-modal hidden">

@@ -921,3 +921,434 @@ document.addEventListener('keydown', (e) => {
         }
     }
 });
+
+// ═══════════════════════════════════════════════════════════
+//  新增模块 1：播客导出按钮
+// ═══════════════════════════════════════════════════════════
+const dlPodcastBtn          = document.getElementById('dl-podcast-btn');
+const podcastModeSelect     = document.getElementById('podcast-mode-select');
+const podcastMultiplierSel  = document.getElementById('podcast-multiplier-select');
+
+dlPodcastBtn.addEventListener('click', () => {
+    if (!manifest) return;
+    const mode       = podcastModeSelect.value;
+    const multiplier = podcastMultiplierSel.value;
+    const url = `/api/download/podcast?run_id=${manifest.run_id}&mode=${mode}&multiplier=${multiplier}`;
+    dlPodcastBtn.disabled = true;
+    dlPodcastBtn.innerText = '⏳ Generating...';
+    checkDownloadResponse(url).finally(() => {
+        dlPodcastBtn.disabled = false;
+        dlPodcastBtn.innerText = '🎧 DL Podcast';
+    });
+});
+
+// ═══════════════════════════════════════════════════════════
+//  新增模块 2：Anki 导出按钮
+// ═══════════════════════════════════════════════════════════
+const dlAnkiBtn = document.getElementById('dl-anki-btn');
+
+dlAnkiBtn.addEventListener('click', () => {
+    if (!manifest) return;
+    const hasZh = manifest.sentences.some(s => s.zh && s.zh.trim());
+    if (!hasZh) {
+        alert('请先生成中文翻译后再导出 Anki 卡片。');
+        return;
+    }
+    const url = `/api/download/anki?run_id=${manifest.run_id}`;
+    dlAnkiBtn.disabled = true;
+    dlAnkiBtn.innerText = '⏳ Packing...';
+    checkDownloadResponse(url).finally(() => {
+        dlAnkiBtn.disabled = false;
+        dlAnkiBtn.innerText = '📦 Export Anki';
+    });
+});
+
+// ═══════════════════════════════════════════════════════════
+//  新增模块 3：Shadowing Mode — 跟读评测
+// ═══════════════════════════════════════════════════════════
+let activeRecognition = null;
+
+function levenshteinWords(a, b) {
+    // 单词级编辑距离
+    const aW = a, bW = b;
+    const m = aW.length, n = bW.length;
+    const dp = Array.from({ length: m + 1 }, (_, i) => Array.from({ length: n + 1 }, (_, j) => i === 0 ? j : j === 0 ? i : 0));
+    for (let i = 1; i <= m; i++) {
+        for (let j = 1; j <= n; j++) {
+            if (aW[i-1] === bW[j-1]) dp[i][j] = dp[i-1][j-1];
+            else dp[i][j] = 1 + Math.min(dp[i-1][j], dp[i][j-1], dp[i-1][j-1]);
+        }
+    }
+    return dp[m][n];
+}
+
+function diffWordsArr(originalWords, spokenWords) {
+    // 返回原文单词数组，每个词带 correct: bool
+    const spokenSet = new Set(spokenWords.map(w => w.replace(/[^\p{L}'-]/gu, '').toLowerCase()));
+    return originalWords.map(w => {
+        const clean = w.replace(/[^\p{L}'-]/gu, '').toLowerCase();
+        return { text: w, correct: clean.length > 0 && spokenSet.has(clean) };
+    });
+}
+
+function startShadowing(sentenceIdx) {
+    if (!('SpeechRecognition' in window) && !('webkitSpeechRecognition' in window)) {
+        showWordSpeakHint('浏览器不支持语音识别，请使用 Chrome 或 Safari。');
+        return;
+    }
+
+    // 暂停正在播放的音频
+    if (isPlaying) {
+        audio.pause();
+        cancelAnimationFrame(rafId);
+        isPlaying = false;
+        updatePlayPauseBtn();
+        updatePlayButtonVisuals();
+        updateArticlePlayingClass();
+    }
+
+    const sentenceDiv = document.getElementById(`s-${sentenceIdx}`);
+    if (!sentenceDiv) return;
+
+    const micBtn = sentenceDiv.querySelector('.shadowing-btn');
+    if (!micBtn) return;
+
+    // 已在录音 → 取消
+    if (activeRecognition) {
+        activeRecognition.abort();
+        activeRecognition = null;
+        micBtn.classList.remove('recording');
+        micBtn.innerText = '🎙';
+        return;
+    }
+
+    // 3 秒倒计时
+    let countdown = document.createElement('div');
+    countdown.className = 'shadowing-countdown';
+    sentenceDiv.style.position = 'relative';
+    sentenceDiv.appendChild(countdown);
+
+    let count = 3;
+    countdown.innerText = count;
+    const timer = setInterval(() => {
+        count--;
+        if (count <= 0) {
+            clearInterval(timer);
+            sentenceDiv.removeChild(countdown);
+            beginRecognition(sentenceIdx, sentenceDiv, micBtn);
+        } else {
+            countdown.innerText = count;
+        }
+    }, 1000);
+}
+
+function beginRecognition(sentenceIdx, sentenceDiv, micBtn) {
+    const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const rec = new SpeechRec();
+    rec.lang = 'en-US';
+    rec.interimResults = false;
+    rec.maxAlternatives = 1;
+
+    activeRecognition = rec;
+    micBtn.classList.add('recording');
+    micBtn.innerText = '⏹';
+
+    rec.onresult = (event) => {
+        const spoken = event.results[0][0].transcript.toLowerCase();
+        const original = manifest.sentences[sentenceIdx].en;
+        const origWords = original.split(/\s+/);
+        const spokWords = spoken.split(/\s+/);
+
+        const diffResult = diffWordsArr(origWords, spokWords);
+        const correctCount = diffResult.filter(w => w.correct).length;
+        const score = Math.round((correctCount / Math.max(diffResult.length, 1)) * 100);
+
+        // 重绘英文单词高亮
+        const enDiv = sentenceDiv.querySelector('.en');
+        if (enDiv) {
+            // 保留原有 word span 结构，只改 class
+            const wordSpans = enDiv.querySelectorAll('.word');
+            wordSpans.forEach((span, wi) => {
+                span.classList.remove('word-correct', 'word-wrong');
+                if (wi < diffResult.length) {
+                    span.classList.add(diffResult[wi].correct ? 'word-correct' : 'word-wrong');
+                }
+            });
+        }
+
+        // 显示得分气泡
+        let badge = sentenceDiv.querySelector('.shadowing-score-badge');
+        if (!badge) {
+            badge = document.createElement('span');
+            badge.className = 'shadowing-score-badge';
+            const content = sentenceDiv.querySelector('.sentence-content');
+            if (content) content.appendChild(badge);
+        }
+        badge.innerText = `${score}%`;
+        badge.className = 'shadowing-score-badge ' + (score >= 80 ? 'score-high' : score >= 50 ? 'score-mid' : 'score-low');
+
+        showWordSpeakHint(`跟读得分：${score}%`);
+    };
+
+    rec.onerror = (e) => {
+        showWordSpeakHint(`语音识别错误：${e.error}`);
+    };
+
+    rec.onend = () => {
+        activeRecognition = null;
+        micBtn.classList.remove('recording');
+        micBtn.innerText = '🎙';
+        // 通知 pitch 采集停止
+        document.dispatchEvent(new CustomEvent('shadowing-ended'));
+    };
+
+    rec.start();
+}
+
+// 把 🎙 按钮注入每个 sentence-row（在 renderManifest 执行后调用）
+function injectShadowingButtons() {
+    document.querySelectorAll('.sentence-row').forEach(row => {
+        if (row.querySelector('.shadowing-btn')) return; // 避免重复注入
+        const idx = parseInt(row.dataset.sentenceIndex);
+        const btn = document.createElement('button');
+        btn.className = 'shadowing-btn';
+        btn.title = '跟读评测（Shadowing）';
+        btn.innerText = '🎙';
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            startShadowing(idx);
+        });
+        row.appendChild(btn);
+    });
+}
+
+// Hook renderManifest 之后自动注入按钮
+const _origRenderManifest = renderManifest;
+window.renderManifest = function() {
+    _origRenderManifest();
+    injectShadowingButtons();
+};
+// 直接覆盖全局同名函数（renderManifest 在同一文件中已用 function 声明）
+// 方案：在 DOMContentLoaded 之后，每次调用原函数时追加
+(function patchRenderManifest() {
+    // 包装：每当调用 renderManifest 后自动注入 shadowing 按钮
+    const orig = renderManifest;
+    // 由于 renderManifest 是 function 声明，重新赋值给全局变量需要用 window
+    // 此处通过 MutationObserver 监听 text-area 的内容变化更可靠
+    const observer = new MutationObserver(() => {
+        injectShadowingButtons();
+    });
+    observer.observe(document.getElementById('text-area'), { childList: true, subtree: false });
+})();
+
+// ═══════════════════════════════════════════════════════════
+//  新增模块 4：Pitch Contour 实时音高可视化
+// ═══════════════════════════════════════════════════════════
+const pitchCanvasContainer = document.getElementById('pitch-canvas-container');
+const pitchCanvas          = document.getElementById('pitch-canvas');
+const pitchStatusText      = document.getElementById('pitch-status-text');
+const pitchCtx             = pitchCanvas.getContext('2d');
+
+let audioCtx        = null;
+let analyserNative  = null;
+let sourceNode      = null;
+let pitchRafId      = null;
+
+// 原声音高数据（当前句子播放期间积累）
+let nativePitchData  = [];
+// 用户跟读音高数据
+let userPitchData    = [];
+let userAnalyser     = null;
+let userStream       = null;
+let userPitchRafId   = null;
+
+function initAudioContext() {
+    if (audioCtx) return;
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+}
+
+// 简化版 YIN 基频估算（在时域缓冲上检测周期性）
+function estimatePitch(buffer, sampleRate) {
+    const SIZE = buffer.length;
+    const yinBuffer = new Float32Array(SIZE / 2);
+    let runningSum = 0;
+
+    for (let tau = 1; tau < SIZE / 2; tau++) {
+        let sum = 0;
+        for (let i = 0; i < SIZE / 2; i++) {
+            const diff = buffer[i] - buffer[i + tau];
+            sum += diff * diff;
+        }
+        yinBuffer[tau] = sum;
+        runningSum += sum;
+        yinBuffer[tau] *= tau / runningSum;
+    }
+
+    // 找第一个低于阈值的 tau
+    const threshold = 0.1;
+    for (let tau = 2; tau < SIZE / 2; tau++) {
+        if (yinBuffer[tau] < threshold) {
+            while (tau + 1 < SIZE / 2 && yinBuffer[tau + 1] < yinBuffer[tau]) tau++;
+            return sampleRate / tau;
+        }
+    }
+    return -1; // 无音高（静音或噪音）
+}
+
+function resizeCanvas() {
+    pitchCanvas.width  = pitchCanvas.offsetWidth  * window.devicePixelRatio;
+    pitchCanvas.height = pitchCanvas.offsetHeight * window.devicePixelRatio;
+    pitchCtx.scale(window.devicePixelRatio, window.devicePixelRatio);
+}
+
+function drawPitchCurve(data, color, canvasW, canvasH) {
+    if (data.length < 2) return;
+    const validData = data.filter(p => p > 0);
+    if (validData.length < 2) return;
+
+    const minP = 60, maxP = 400; // Hz 范围
+    pitchCtx.beginPath();
+    pitchCtx.strokeStyle = color;
+    pitchCtx.lineWidth = 2;
+    pitchCtx.lineJoin = 'round';
+
+    let started = false;
+    data.forEach((pitch, i) => {
+        if (pitch <= 0) return;
+        const x = (i / (data.length - 1)) * canvasW;
+        const y = canvasH - ((Math.min(maxP, Math.max(minP, pitch)) - minP) / (maxP - minP)) * canvasH;
+        if (!started) { pitchCtx.moveTo(x, y); started = true; }
+        else pitchCtx.lineTo(x, y);
+    });
+    pitchCtx.stroke();
+}
+
+function renderPitchCanvas() {
+    resizeCanvas();
+    const W = pitchCanvas.offsetWidth;
+    const H = pitchCanvas.offsetHeight;
+    pitchCtx.clearRect(0, 0, W, H);
+
+    // 背景网格
+    pitchCtx.strokeStyle = 'rgba(255,255,255,0.05)';
+    pitchCtx.lineWidth = 1;
+    for (let y = 0; y < H; y += H / 4) {
+        pitchCtx.beginPath();
+        pitchCtx.moveTo(0, y);
+        pitchCtx.lineTo(W, y);
+        pitchCtx.stroke();
+    }
+
+    drawPitchCurve(nativePitchData, '#f97316', W, H);
+    drawPitchCurve(userPitchData,   '#38bdf8', W, H);
+}
+
+// 原声 pitch 采集（挂在 audio 元素上）
+function startNativePitchCapture() {
+    initAudioContext();
+    if (!analyserNative) {
+        analyserNative = audioCtx.createAnalyser();
+        analyserNative.fftSize = 2048;
+        if (!sourceNode) {
+            sourceNode = audioCtx.createMediaElementSource(audio);
+            sourceNode.connect(analyserNative);
+            analyserNative.connect(audioCtx.destination);
+        }
+    }
+
+    nativePitchData = [];
+    pitchCanvasContainer.classList.remove('hidden');
+    pitchStatusText.innerText = '🎵 播放中...';
+
+    const buffer = new Float32Array(analyserNative.fftSize);
+    function loop() {
+        if (audio.paused || audio.ended) {
+            pitchStatusText.innerText = '🎵 播放结束';
+            return;
+        }
+        analyserNative.getFloatTimeDomainData(buffer);
+        const pitch = estimatePitch(buffer, audioCtx.sampleRate);
+        if (pitch > 60 && pitch < 600) nativePitchData.push(pitch);
+        else nativePitchData.push(0);
+
+        renderPitchCanvas();
+        pitchRafId = requestAnimationFrame(loop);
+    }
+    cancelAnimationFrame(pitchRafId);
+    pitchRafId = requestAnimationFrame(loop);
+}
+
+function stopNativePitchCapture() {
+    cancelAnimationFrame(pitchRafId);
+    renderPitchCanvas();
+}
+
+// 用户麦克风 pitch 采集（Shadowing 时调用）
+async function startUserPitchCapture() {
+    try {
+        userStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        initAudioContext();
+        const source = audioCtx.createMediaStreamSource(userStream);
+        userAnalyser = audioCtx.createAnalyser();
+        userAnalyser.fftSize = 2048;
+        source.connect(userAnalyser);
+
+        userPitchData = [];
+        pitchCanvasContainer.classList.remove('hidden');
+        pitchStatusText.innerText = '🎙 录音中...';
+
+        const buffer = new Float32Array(userAnalyser.fftSize);
+        function loop() {
+            if (!userStream || !userStream.active) {
+                pitchStatusText.innerText = '🎙 录音结束';
+                return;
+            }
+            userAnalyser.getFloatTimeDomainData(buffer);
+            const pitch = estimatePitch(buffer, audioCtx.sampleRate);
+            if (pitch > 60 && pitch < 600) userPitchData.push(pitch);
+            else userPitchData.push(0);
+
+            renderPitchCanvas();
+            userPitchRafId = requestAnimationFrame(loop);
+        }
+        cancelAnimationFrame(userPitchRafId);
+        userPitchRafId = requestAnimationFrame(loop);
+    } catch (e) {
+        pitchStatusText.innerText = '麦克风权限被拒绝';
+    }
+}
+
+function stopUserPitchCapture() {
+    cancelAnimationFrame(userPitchRafId);
+    if (userStream) {
+        userStream.getTracks().forEach(t => t.stop());
+        userStream = null;
+    }
+    renderPitchCanvas();
+    pitchStatusText.innerText = '🎙 录音已停止';
+}
+
+// Hook 到音频播放事件
+audio.addEventListener('play', () => {
+    startNativePitchCapture();
+});
+audio.addEventListener('pause', () => {
+    stopNativePitchCapture();
+});
+audio.addEventListener('ended', () => {
+    stopNativePitchCapture();
+});
+
+
+// Shadowing 与 Pitch 联动：包装 startShadowing，在倒计时结束前先启动用户音高采集
+window._origStartShadowing = startShadowing;
+window.startShadowing = function(sentenceIdx) {
+    userPitchData = [];
+    startUserPitchCapture(); // 异步启动麦克风 pitch，不阻塞倒计时
+    window._origStartShadowing(sentenceIdx);
+};
+
+// 当录音结束时停止用户 pitch 采集（通过 CustomEvent 触发）
+document.addEventListener('shadowing-ended', stopUserPitchCapture);
+
+

@@ -5,3 +5,6 @@ edge-tts
 aiofileseng-to-ipa
 deep-translator
 argostranslate
+pysbd
+genanki
+audioop-lts
