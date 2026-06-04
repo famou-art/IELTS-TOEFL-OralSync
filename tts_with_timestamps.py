@@ -1,9 +1,8 @@
-import os
 import edge_tts
 import asyncio
 
-VOICE = os.getenv("DEFAULT_TTS_VOICE", "en-US-ChristopherNeural")
-RATE = os.getenv("DEFAULT_TTS_RATE", "-10%")
+VOICE = "en-US-ChristopherNeural"
+RATE = "-10%"
 
 async def generate_tts_with_timestamps(text: str, output_mp3: str):
     """

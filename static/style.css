@@ -130,7 +130,7 @@ select {
 }
 .app-layout.vocab-collapsed .panel-toggle {
     right: 0;
-    border-radius: 4px 0 0 4px; /* stays same, just shifts right */
+    border-radius: 4px 0 0 4px;
 }
 
 /* 沉浸式模式 */
@@ -182,7 +182,6 @@ body.immersive-mode .panel-toggle {
     margin-bottom: 15px;
     transition: background 0.3s ease, border-color 0.3s ease;
     border: 1px solid transparent;
-    cursor: pointer; /* 整行可点 */
 }
 
 .sentence-row:hover {
@@ -208,7 +207,7 @@ body.immersive-mode .panel-toggle {
     justify-content: center;
     cursor: pointer;
     font-size: 14px;
-    padding: 0; /* Override default button padding */
+    padding: 0;
     transition: background-color 0.2s, color 0.2s;
 }
 
@@ -231,13 +230,22 @@ body.immersive-mode .panel-toggle {
     transition: font-size 0.3s ease;
 }
 
+/* 单词样式与点读反馈 */
 .word {
     border-radius: 3px;
     padding: 0 1px;
     transition: background-color 0.05s, color 0.05s;
+    cursor: pointer;
 }
 
-/* 强制重写 active-word，添加 !important 确保生效 */
+body:not(.article-playing) .word:hover {
+    background: #e0f2fe;
+}
+
+body.article-playing .word {
+    cursor: not-allowed;
+}
+
 .word.active-word {
     background: #ffbfd4 !important;
     color: #9f1239 !important;
@@ -245,6 +253,35 @@ body.immersive-mode .panel-toggle {
     text-decoration: underline solid #e11d48 3px !important;
     border-radius: 6px !important;
     padding: 0 3px !important;
+}
+
+/* 临时独立朗读的样式 */
+.word.speaking-word {
+    background: #dbeafe !important;
+    color: #1d4ed8 !important;
+    border-radius: 6px !important;
+    padding: 0 3px !important;
+}
+
+/* 单词点读状态提示条 */
+.word-speak-status {
+    position: fixed;
+    top: 15px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #1e40af;
+    color: white;
+    padding: 8px 16px;
+    border-radius: 9999px;
+    font-size: 14px;
+    font-weight: bold;
+    z-index: 10000;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+}
+.word-speak-status.show {
+    opacity: 1;
 }
 
 .zh-line {

@@ -9,6 +9,8 @@ let activeWordIndex = -1;
 let statusPollInterval = null;
 let manifestPollInterval = null;
 
+let wordSpeakStatusTimer = null;
+
 const uploadBtn = document.getElementById('upload-btn');
 const genZhBtn = document.getElementById('gen-zh-btn');
 const translationEngine = document.getElementById('translationEngine');
@@ -42,6 +44,8 @@ const dlCurrentBtn = document.getElementById('dl-current-btn');
 const dlAllBtn = document.getElementById('dl-all-btn');
 const dlMergedBtn = document.getElementById('dl-merged-btn');
 
+const wordSpeakStatus = document.getElementById('wordSpeakStatus');
+
 // Debug Panel Elements
 const debugPanel = document.getElementById('debug-panel');
 const debugHeader = document.getElementById('debug-header');
@@ -54,6 +58,12 @@ const showDebugBtn = document.getElementById('show-debug-btn');
 const historyModal = document.getElementById('historyModal');
 const closeHistoryBtn = document.getElementById('closeHistoryBtn');
 const historyList = document.getElementById('historyList');
+
+function cleanWord(raw) {
+    return String(raw || "")
+        .trim()
+        .replace(/[^\p{L}'-]/gu, "");
+}
 
 // --- Initialization ---
 function initPage() {
@@ -84,14 +94,12 @@ function initPage() {
     if (w) debugPanel.style.width = w;
     if (h) debugPanel.style.height = h;
 
-    // Load any saved playback speed
     const savedSpeed = localStorage.getItem("playbackSpeed");
     if (savedSpeed) {
         speedSelect.value = savedSpeed;
         audio.playbackRate = parseFloat(savedSpeed);
     }
     
-    // Default empty state
     clearCurrentPractice();
 }
 
@@ -120,6 +128,7 @@ function clearCurrentPractice() {
     translationProgressBox.classList.add('hidden');
     
     updateDebugPanel();
+    updateArticlePlayingClass();
 }
 
 clearBtn.addEventListener('click', clearCurrentPractice);
@@ -411,7 +420,6 @@ uploadBtn.addEventListener('click', async () => {
         if (!res.ok) throw new Error("Server error");
         manifest = await res.json();
         
-        // Try to load history to get the newly generated title immediately
         const histRes = await fetch('/api/history');
         if (histRes.ok) {
             const histData = await histRes.json();
@@ -511,7 +519,8 @@ genZhBtn.addEventListener('click', async () => {
 function renderManifest() {
     textArea.innerHTML = manifest.sentences.map((s, i) => {
         const wordsHtml = s.words.map((w, wi) => {
-            return `<span class="word" data-word-index="${wi}" data-start="${w.start}" data-end="${w.end}">${w.text}</span> `;
+            const safeWord = cleanWord(w.text);
+            return `<span class="word" data-word-index="${wi}" data-start="${w.start}" data-end="${w.end}" data-word-text="${safeWord}">${w.text}</span> `;
         }).join('');
 
         let zhHtml = s.zh || "";
@@ -531,6 +540,11 @@ function renderManifest() {
             </div>
         `;
     }).join('');
+    
+    // Bind click events on words immediately after rendering
+    document.querySelectorAll('.word').forEach(span => {
+        span.addEventListener('click', handleWordClick);
+    });
     
     let vocabHtml = `<h3>Core Words</h3><ul>`;
     manifest.vocab.core_words.forEach(v => {
@@ -586,14 +600,100 @@ function scrollSentenceIntoCenter(index) {
     el.scrollIntoView({ behavior: "smooth", block: "center" });
 }
 
+function updateArticlePlayingClass() {
+    if (isPlaying) {
+        document.body.classList.add("article-playing");
+    } else {
+        document.body.classList.remove("article-playing");
+    }
+}
+
+function showWordSpeakHint(message) {
+    if (!wordSpeakStatus) return;
+    
+    const text = String(message || "");
+    wordSpeakStatus.textContent = text.length > 80 ? text.slice(0, 80) + "..." : text;
+    wordSpeakStatus.classList.add('show');
+    
+    clearTimeout(window.wordSpeakStatusTimer);
+    window.wordSpeakStatusTimer = setTimeout(() => {
+        wordSpeakStatus.textContent = "";
+        wordSpeakStatus.classList.remove('show');
+    }, 1500);
+}
+
+function speakSingleWord(word, el = null) {
+    const clean = cleanWord(word);
+    if (!clean) return;
+
+    if (!("speechSynthesis" in window)) {
+        showWordSpeakHint("Speech synthesis is not supported in this browser.");
+        return;
+    }
+
+    window.speechSynthesis.cancel();
+
+    const utterance = new SpeechSynthesisUtterance(clean);
+    utterance.lang = "en-US";
+    utterance.rate = 0.85;
+    utterance.pitch = 1.0;
+    utterance.volume = 1.0;
+
+    const voices = window.speechSynthesis.getVoices();
+    const usVoice = voices.find(v => v.lang && v.lang.toLowerCase().startsWith("en-us"));
+    if (usVoice) utterance.voice = usVoice;
+
+    if (el) {
+        document.querySelectorAll(".speaking-word")
+            .forEach(node => node.classList.remove("speaking-word"));
+        el.classList.add("speaking-word");
+
+        utterance.onend = () => {
+            el.classList.remove("speaking-word");
+        };
+
+        utterance.onerror = () => {
+            el.classList.remove("speaking-word");
+        };
+    }
+
+    showWordSpeakHint(`Speaking: ${clean}`);
+    window.speechSynthesis.speak(utterance);
+}
+
+function handleWordClick(event) {
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (!audio.paused && !audio.ended && audio.currentTime > 0 && isPlaying) {
+        showWordSpeakHint("Pause article first to hear individual words.");
+        return;
+    }
+
+    const el = event.currentTarget;
+    const word = el.dataset.wordText;
+
+    if (!word) return;
+
+    speakSingleWord(word, el);
+}
+
 // --- Event Delegation for Clickable Sentences ---
 textArea.addEventListener('click', (e) => {
+    // Check if clicking on .word is intercepted by handleWordClick (via stopPropagation)
+    if (e.target.closest(".word")) {
+        return;
+    }
+
+    // Check if clicking on play button
     const btn = e.target.closest('.sentence-play-btn');
     if (btn) {
         const idx = parseInt(btn.dataset.sentenceIndex);
         jumpToSentence(idx, true);
         return;
     }
+    
+    // Check if clicking row
     const row = e.target.closest('.sentence-row');
     if (row) {
         const idx = parseInt(row.dataset.sentenceIndex);
@@ -602,6 +702,10 @@ textArea.addEventListener('click', (e) => {
 });
 
 textArea.addEventListener('dblclick', (e) => {
+    if (e.target.closest(".word")) {
+        return;
+    }
+    
     const row = e.target.closest('.sentence-row');
     if (row) {
         const idx = parseInt(row.dataset.sentenceIndex);
@@ -640,6 +744,7 @@ async function jumpToSentence(index, shouldPlay = true) {
         isPlaying = true;
         updatePlayPauseBtn();
         updatePlayButtonVisuals();
+        updateArticlePlayingClass();
         try {
             await audio.play();
             rafId = requestAnimationFrame(updateWordHighlight);
@@ -648,6 +753,7 @@ async function jumpToSentence(index, shouldPlay = true) {
         isPlaying = false;
         updatePlayPauseBtn();
         updatePlayButtonVisuals();
+        updateArticlePlayingClass();
     }
 }
 
@@ -700,6 +806,14 @@ function updateWordHighlight() {
     }
 }
 
+audio.addEventListener('play', () => {
+    updateArticlePlayingClass();
+});
+
+audio.addEventListener('pause', () => {
+    updateArticlePlayingClass();
+});
+
 audio.addEventListener('ended', async () => {
     cancelAnimationFrame(rafId);
     document.querySelectorAll('.active-word').forEach(el => el.classList.remove('active-word'));
@@ -711,9 +825,17 @@ audio.addEventListener('ended', async () => {
         isPlaying = false;
         updatePlayPauseBtn();
         updatePlayButtonVisuals();
+        updateArticlePlayingClass();
     }
     updateDebugPanel();
 });
+
+// Load voices proactively
+if ('speechSynthesis' in window) {
+    window.speechSynthesis.onvoiceschanged = () => {
+        window.speechSynthesis.getVoices();
+    };
+}
 
 // --- Nav Controls ---
 restartBtn.addEventListener('click', () => jumpToSentence(0, true));
@@ -739,6 +861,7 @@ playPauseBtn.addEventListener('click', () => {
     }
     updatePlayPauseBtn();
     updatePlayButtonVisuals();
+    updateArticlePlayingClass();
 });
 
 function updatePlayPauseBtn() {

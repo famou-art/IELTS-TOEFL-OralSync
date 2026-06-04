@@ -2,7 +2,6 @@
 __pycache__/
 *.py[cod]
 *$py.class
-*.so
 .Python
 env/
 build/
@@ -33,21 +32,16 @@ venv.bak/
 .env.local
 
 # Project Specific Directories & Files
-runs/*
-!runs/.gitkeep
+runs/
 server.log
 uvicorn.log
 *.log
 
-# Audio and Compressed Formats
-*.mp3
-*.wav
-*.m4a
-*.zip
-
-# Caches
-.cache/
-.pytest_cache/
+# Temporary / Test Files
+chinese_cache.json
+test.txt
+test_gemini.py
+test_engines.py
 
 # macOS
 .DS_Store
